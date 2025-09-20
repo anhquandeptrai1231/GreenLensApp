@@ -9,11 +9,11 @@ import {
   Alert,
 } from "react-native";
 import axios, { AxiosError } from "axios";
-import { useNavigation } from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../App";
+import { useNavigation } from "@react-navigation/native";
 
-// URL API (nên tách riêng file config sau này)
 const API_URL = "http://10.0.2.2:5101/api/Auth/login";
 
 interface LoginResponse {
@@ -30,12 +30,17 @@ interface LoginResponse {
   };
 }
 
-const LoginScreen: React.FC = () => {
+type LoginScreenProps = {
+  onLoginSuccess: () => void;
+};
+
+const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [username, setUsername] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(false);
+
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
     if (!username || !password) {
@@ -45,43 +50,33 @@ const LoginScreen: React.FC = () => {
 
     try {
       setLoading(true);
-
       const response = await axios.post<LoginResponse>(API_URL, {
-        email: username, // backend yêu cầu email
+        email: username,
         password,
       });
 
-      console.log("✅ Response:", response.data);
-
       if (response.data.succeeded) {
         const { accessToken, refreshToken, user } = response.data.data;
+
+        await AsyncStorage.setItem("accessToken", accessToken);
+        await AsyncStorage.setItem("refreshToken", refreshToken);
+
         Alert.alert("Thành công", `Xin chào ${user.username}`);
-        console.log("Access Token:", accessToken);
-        // 👉 có thể lưu token vào AsyncStorage hoặc Redux ở đây
+
+        onLoginSuccess(); // 👉 báo về App
       } else {
-        Alert.alert(
-          "Đăng nhập thất bại",
-          response.data.message || "Sai thông tin đăng nhập"
-        );
+        // Nếu backend trả về succeeded=false
+        Alert.alert("Đăng nhập thất bại", "Tài khoản hoặc mật khẩu không đúng");
       }
     } catch (error) {
       const err = error as AxiosError<any>;
-      console.error("❌ Lỗi gọi API:", err);
-
       if (err.response) {
-        console.log("📡 Response error:", err.response.data);
-        Alert.alert(
-          "Lỗi",
-          `Server trả về ${err.response.status}: ${JSON.stringify(
-            err.response.data
-          )}`
-        );
-      } else if (err.request) {
-        console.log("📡 Request error:", err.request);
-        Alert.alert(
-          "Lỗi mạng",
-          "Không thể kết nối tới server. Kiểm tra IP/Port hoặc cleartextTraffic."
-        );
+        if (err.response.status === 401) {
+          // Nếu server trả về Unauthorized
+          Alert.alert("Đăng nhập thất bại", "Tài khoản hoặc mật khẩu không đúng");
+        } else {
+          Alert.alert("Lỗi", `Server trả về ${err.response.status}`);
+        }
       } else {
         Alert.alert("Lỗi", err.message);
       }
@@ -100,9 +95,7 @@ const LoginScreen: React.FC = () => {
         value={username}
         onChangeText={setUsername}
         autoCapitalize="none"
-        keyboardType="email-address"
       />
-
       <TextInput
         style={styles.input}
         placeholder="Mật khẩu"
@@ -119,12 +112,10 @@ const LoginScreen: React.FC = () => {
         </TouchableOpacity>
       )}
 
-      {/* Link sang Register */}
       <TouchableOpacity onPress={() => navigation.navigate("Register")}>
         <Text style={styles.link}>Chưa có tài khoản? Đăng ký ngay</Text>
       </TouchableOpacity>
 
-      {/* Link sang ForgotPassword */}
       <TouchableOpacity onPress={() => navigation.navigate("ForgotPassword")}>
         <Text style={[styles.link, { color: "red" }]}>Quên mật khẩu?</Text>
       </TouchableOpacity>
@@ -135,39 +126,10 @@ const LoginScreen: React.FC = () => {
 export default LoginScreen;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    padding: 20,
-    backgroundColor: "#fff",
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: "bold",
-    marginBottom: 30,
-    textAlign: "center",
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 15,
-  },
-  button: {
-    backgroundColor: "#007BFF",
-    padding: 15,
-    borderRadius: 8,
-    marginTop: 10,
-  },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    textAlign: "center",
-  },
-  link: {
-    marginTop: 15,
-    textAlign: "center",
-    color: "blue",
-  },
+  container: { flex: 1, justifyContent: "center", padding: 20, backgroundColor: "#fff" },
+  title: { fontSize: 26, fontWeight: "bold", marginBottom: 30, textAlign: "center" },
+  input: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, padding: 12, marginBottom: 15 },
+  button: { backgroundColor: "#007BFF", padding: 15, borderRadius: 8 },
+  buttonText: { color: "#fff", fontWeight: "bold", textAlign: "center" },
+  link: { marginTop: 15, textAlign: "center", color: "blue" },
 });
