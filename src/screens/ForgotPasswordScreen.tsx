@@ -14,7 +14,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../App";
 
 // 👉 API URL (chỉnh port theo backend của bạn)
-const API_URL = "http://10.0.2.2:5101/api/Auth/forgot-password";
+const API_URL = "http://192.168.130.190:5101/api/Auth/forgot-password";
 
 interface ForgotPasswordResponse {
   succeeded: boolean;

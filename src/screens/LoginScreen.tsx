@@ -14,7 +14,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../App";
 import { useNavigation } from "@react-navigation/native";
 
-const API_URL = "http://10.0.2.2:5101/api/Auth/login";
+const API_URL = "http://192.168.130.190:5101/api/Auth/login";
 
 interface LoginResponse {
   succeeded: boolean;

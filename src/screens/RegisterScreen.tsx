@@ -15,7 +15,7 @@ import { RootStackParamList } from "../App";
 import { Picker } from "@react-native-picker/picker";
 
 // URL API
-const API_URL = "http://10.0.2.2:5101/api/Auth/register";
+const API_URL = "http://192.168.130.190:5101/api/Auth/register";
 
 interface RegisterResponse {
   succeeded: boolean;
