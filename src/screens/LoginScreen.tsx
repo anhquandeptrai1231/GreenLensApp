@@ -26,6 +26,7 @@ interface LoginResponse {
       id: string;
       email: string;
       username: string;
+      isEmailConfirmed?: boolean; // backend có gửi trường này
     };
   };
 }
@@ -43,37 +44,71 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!username || !password) {
-      Alert.alert("Lỗi", "Vui lòng nhập đầy đủ thông tin");
+    // 1. Check email & password không được trống
+    if (!username.trim()) {
+      Alert.alert("Lỗi", "Email không được để trống");
+      return;
+    }
+    if (!password.trim()) {
+      Alert.alert("Lỗi", "Mật khẩu không được để trống");
+      return;
+    }
+
+    // 2. Validate mật khẩu client-side
+    const passwordRegex =
+      /^(?=.*[A-Z])(?=.*[!@#$%^&*()_+\-[\]{};':"\\|,.<>/?]).{8,}$/;
+    if (!passwordRegex.test(password)) {
+      Alert.alert(
+        "Lỗi mật khẩu",
+        "Mật khẩu phải có ít nhất 8 ký tự, 1 chữ in hoa và 1 ký tự đặc biệt"
+      );
       return;
     }
 
     try {
       setLoading(true);
-      const response = await axios.post<LoginResponse>(API_URL, {
-        email: username,
-        password,
-      });
+
+      const payload = { email: username.trim(), password: password.trim() };
+      console.log("Payload gửi đi:", payload);
+
+      const response = await axios.post<LoginResponse>(API_URL, payload);
 
       if (response.data.succeeded) {
         const { accessToken, refreshToken, user } = response.data.data;
 
+        // 3. Kiểm tra email đã xác thực chưa
+        if (user.isEmailConfirmed === false) {
+          Alert.alert(
+            "Lỗi",
+            "Tài khoản chưa xác thực email. Vui lòng kiểm tra email để xác thực"
+          );
+          return;
+        }
+
+        // 4. Lưu token vào AsyncStorage
         await AsyncStorage.setItem("accessToken", accessToken);
         await AsyncStorage.setItem("refreshToken", refreshToken);
 
         Alert.alert("Thành công", `Xin chào ${user.username}`);
-
-        onLoginSuccess(); // 👉 báo về App
+        onLoginSuccess();
       } else {
-        // Nếu backend trả về succeeded=false
-        Alert.alert("Đăng nhập thất bại", "Tài khoản hoặc mật khẩu không đúng");
+        // 5. Show message từ server nếu login thất bại
+        Alert.alert(
+          "Đăng nhập thất bại",
+          response.data.message || "Tài khoản hoặc mật khẩu không đúng"
+        );
       }
     } catch (error) {
       const err = error as AxiosError<any>;
       if (err.response) {
-        if (err.response.status === 401) {
-          // Nếu server trả về Unauthorized
-          Alert.alert("Đăng nhập thất bại", "Tài khoản hoặc mật khẩu không đúng");
+        const data = err.response.data;
+        console.log("API error:", data);
+
+        if (data?.message) {
+          Alert.alert("Đăng nhập thất bại", data.message);
+        } else if (data?.errors) {
+          const errorMessages = Object.values(data.errors).flat().join("\n");
+          Alert.alert("Lỗi", errorMessages);
         } else {
           Alert.alert("Lỗi", `Server trả về ${err.response.status}`);
         }
@@ -95,6 +130,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         value={username}
         onChangeText={setUsername}
         autoCapitalize="none"
+        keyboardType="email-address"
       />
       <TextInput
         style={styles.input}
@@ -126,10 +162,38 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 export default LoginScreen;
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: "center", padding: 20, backgroundColor: "#fff" },
-  title: { fontSize: 26, fontWeight: "bold", marginBottom: 30, textAlign: "center" },
-  input: { borderWidth: 1, borderColor: "#ccc", borderRadius: 8, padding: 12, marginBottom: 15 },
-  button: { backgroundColor: "#007BFF", padding: 15, borderRadius: 8 },
-  buttonText: { color: "#fff", fontWeight: "bold", textAlign: "center" },
-  link: { marginTop: 15, textAlign: "center", color: "blue" },
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    padding: 20,
+    backgroundColor: "#fff",
+  },
+  title: {
+    fontSize: 26,
+    fontWeight: "bold",
+    marginBottom: 30,
+    textAlign: "center",
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 15,
+  },
+  button: {
+    backgroundColor: "#007BFF",
+    padding: 15,
+    borderRadius: 8,
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  link: {
+    marginTop: 15,
+    textAlign: "center",
+    color: "blue",
+  },
 });
